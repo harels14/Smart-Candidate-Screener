@@ -3,7 +3,7 @@ import PyPDF2
 from io import BytesIO
 from app.models.cvExaminate import cv_analyzer
 router = APIRouter() #Create router / sub application
-
+import asyncio
 
 async def process_single_cv(file: UploadFile,job_desc: str):
     try:
@@ -31,16 +31,18 @@ async def upload_cv(file: UploadFile = File(...), job_desc: str = Form(...)):
 
 @router.post("/upload-cvs") #Upload and process multiple files
 async def upload_cvs(files: list[UploadFile] = File(...), job_desc: str = Form(...)):
-    results = []
 
-    for i,file in enumerate(files):
-        analysis = await process_single_cv(file,job_desc)
-
-        results.append({
+    coroutines = [process_single_cv(file,job_desc) for file in files]
+    analyses = await asyncio.gather(*coroutines)
+    results = [ 
+        {
             "file_index": i,
-        "file_name" : file.filename,
-            "analysis": analysis
-        })
+            "file_name": file.filename,
+            "analysis": analyses[i]
+        }
+        for i, file in enumerate(files) 
+    ]
+    
     return {
         "total_files": len(files),
         "job_description": job_desc,
